@@ -15,8 +15,9 @@ event="${1:-PostToolUse}"
 skill="$(printf '%s' "$input" | jq -r '.tool_input.skill // .tool_input.name // ""' 2>/dev/null)"
 [ -z "$skill" ] && exit 0
 
-# Fast reject: not a forged name -> nothing to do. Exact field match (fixed string).
-line="$(grep -F "\"name\":\"$skill\"" "$LEDGER" 2>/dev/null | head -1)"
+# Fast reject: not a forged name -> nothing to do. Parse each JSONL entry by name (format-tolerant;
+# a fixed-string grep breaks on the ledger's pretty-printed `"name": "x"` spacing).
+line="$(jq -c --arg n "$skill" 'select(.name == $n)' "$LEDGER" 2>/dev/null | head -1)"
 [ -z "$line" ] && exit 0
 status="$(printf '%s' "$line" | jq -r '.status // "active"' 2>/dev/null)"
 [ "$status" = "active" ] || exit 0
