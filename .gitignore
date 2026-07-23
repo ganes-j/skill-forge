@@ -1,0 +1,7 @@
+# Forge state fills in at runtime — this repo ships the EMPTY scaffold only.
+# Never commit real ledger/usage/count entries: they name your private skills.
+skill-forge/counts/*
+!skill-forge/counts/.gitkeep
+
+# Local-only sanitization / leak-gate terms, if you add a leak check.
+*.local.txt

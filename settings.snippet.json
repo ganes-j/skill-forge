@@ -1,0 +1,40 @@
+{
+  "_comment": "Merge these three hook entries into the matching arrays of your ~/.claude/settings.json. Do NOT paste this file wholesale — it is a fragment. Claude Code runs each command through a shell, so $HOME expands; you may also use absolute paths. See INSTALL.md.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/skill-forge-status.sh",
+            "async": false
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/skill-forge-usage.sh PostToolUse",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/skill-forge-scan-nudge.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
