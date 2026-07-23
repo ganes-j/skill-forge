@@ -92,6 +92,33 @@ invoking the skill, so nothing got counted. The fix was to make the wrap-up step
 skill-forge through the `Skill` tool. If you wire the scan into your own session wrap-up ritual,
 wire it the same way: "invoke the skill-forge skill (scan mode)", not "think about gaps."
 
+## A wired hook can be silently dead
+
+One lesson worth stating plainly, because it cost real refine cycles before it was caught: a hook
+that's correctly registered and runs without error can still do *nothing useful*. The usage hook
+matched ledger entries with a fixed-string `grep` for `"name":"x"` — but the ledger is written
+pretty-printed (`"name": "x"`, space after the colon), so the match failed for every entry and the
+hook exited cleanly, logging nothing. Counts never incremented; the refine nudge could never fire.
+The only reason the ledger had *any* usage lines was that the skill itself wrote them — which masked
+the gap. Both hooks now parse the ledger with `jq` instead.
+
+Root rule: **don't fixed-string-grep JSON — parse it.** The writer's format (compact vs pretty) must
+match the reader's parser, or a wired hook goes silently dead. `tests/smoke-hooks.sh` pins this by
+running the hooks against a pretty-printed ledger with a simulated `Skill` payload; run it after any
+hook change:
+
+```bash
+bash tests/smoke-hooks.sh
+```
+
+Or verify a single hook by hand — pipe a payload through it and confirm it logs and counts:
+
+```bash
+printf '{"tool_input":{"skill":"<a-forged-skill>"},"session_id":"verify"}' \
+  | bash hooks/skill-forge-usage.sh PostToolUse
+# expect: a new usage.jsonl line and counts/<skill> incremented
+```
+
 ## Maturity
 
 Honest status, because the whole point of this thing is trusting on evidence rather than assertion.
