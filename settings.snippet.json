@@ -1,5 +1,5 @@
 {
-  "_comment": "Merge these three hook entries into the matching arrays of your ~/.claude/settings.json. Do NOT paste this file wholesale — it is a fragment. Claude Code runs each command through a shell, so $HOME expands; you may also use absolute paths. See INSTALL.md.",
+  "_comment": "Merge these four hook entries into the matching arrays of your ~/.claude/settings.json. Do NOT paste this file wholesale — it is a fragment. Claude Code runs each command through a shell, so $HOME expands; you may also use absolute paths. See INSTALL.md.",
   "hooks": {
     "SessionStart": [
       {
@@ -20,6 +20,17 @@
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/skill-forge-usage.sh PostToolUse",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "_comment": "Second mode: catches a skill whose payload is a script driven straight from the shell, which the Skill tool never sees. Without this, script-payload skills under-count badly.",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/skill-forge-usage.sh --detect-bash PostToolUse",
             "timeout": 10
           }
         ]

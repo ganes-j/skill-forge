@@ -22,7 +22,7 @@ bad()  { echo "  FAIL: $1"; fail=1; }
 
 # Sandbox TMPDIR too: the usage hook dedups its nudge with a marker in $TMPDIR, so a run must
 # not inherit a marker left by an earlier run (fixed session ids would otherwise collide).
-run() { HOME="$TMP/home" TMPDIR="$TMP" bash "$FAKE/hooks/$1" "${2:-}"; }
+run() { local h="$1"; shift; HOME="$TMP/home" TMPDIR="$TMP" bash "$FAKE/hooks/$h" "$@"; }
 
 echo "TEST 1: status hook is silent on an empty ledger"
 out="$(run skill-forge-status.sh </dev/null)"
@@ -33,7 +33,7 @@ cat > "$FAKE/skill-forge/ledger.jsonl" <<'EOF'
 {
   "name": "demo-skill",
   "kind": "skill",
-  "path": "x",
+  "path": "~/.claude/skills/demo-skill/SKILL.md",
   "gap": "g",
   "created": "2026-01-01",
   "last_refined": "2026-01-01",
@@ -57,9 +57,24 @@ echo "TEST 4: refine nudge fires once the threshold is reached"
 echo "$PAYLOAD" | run skill-forge-usage.sh PostToolUse >/dev/null   # count -> 2
 echo "$PAYLOAD" | run skill-forge-usage.sh PostToolUse >/dev/null   # count -> 3
 nudge="$(echo '{"tool_input":{"skill":"demo-skill"},"session_id":"fresh"}' | run skill-forge-usage.sh PostToolUse)"
-if echo "$nudge" | grep -q 'due for a refinement'; then pass "nudge fired at threshold"; else bad "no nudge at threshold"; fi
+if echo "$nudge" | grep -q 'threshold 3'; then pass "nudge fired at threshold"; else bad "no nudge at threshold"; fi
+# The refine DATE is the counter-evidence that stops a bare count being read as a verdict.
+# Without it the nudge is just a number and gets relayed as a finding; pin it.
+if echo "$nudge" | grep -q '2026-01-01'; then pass "nudge carries last_refined date"; else bad "nudge omitted last_refined date"; fi
 
-echo "TEST 5: kill switch silences every hook"
+echo "TEST 5: --detect-bash counts a skill driven straight from the shell"
+BASHPAYLOAD='{"tool_input":{"command":"~/.claude/skills/demo-skill/run.sh --flag"},"session_id":"shell"}'
+echo "$BASHPAYLOAD" | run skill-forge-usage.sh --detect-bash PostToolUse >/dev/null
+cnt5="$(cat "$FAKE/skill-forge/counts/demo-skill" 2>/dev/null || echo MISSING)"
+if [ "$cnt5" = "5" ]; then pass "shell run incremented the counter (5)"; else bad "counter == $cnt5, expected 5"; fi
+if grep -q '"event":"ran"' "$FAKE/skill-forge/usage.jsonl"; then pass "logged as event=ran, distinct from invoked"; else bad "no ran event logged"; fi
+# A Bash call unrelated to any forged skill must cost nothing and log nothing.
+before="$(wc -l < "$FAKE/skill-forge/usage.jsonl")"
+echo '{"tool_input":{"command":"ls -la /tmp"},"session_id":"shell"}' | run skill-forge-usage.sh --detect-bash PostToolUse >/dev/null
+after="$(wc -l < "$FAKE/skill-forge/usage.jsonl")"
+if [ "$before" = "$after" ]; then pass "unrelated Bash call ignored"; else bad "unrelated Bash call logged a use"; fi
+
+echo "TEST 6: kill switch silences every hook"
 touch "$TMP/home/.claude/.forge-off"
 ks="$(echo "$PAYLOAD" | run skill-forge-usage.sh PostToolUse; run skill-forge-status.sh </dev/null)"
 if [ -z "$ks" ]; then pass "silent when .forge-off exists"; else bad "not silenced"; fi
