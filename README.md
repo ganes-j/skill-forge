@@ -66,7 +66,7 @@ hooks/skill-forge-status.sh        SessionStart — surfaces active forged skill
 hooks/skill-forge-usage.sh         PostToolUse(Skill) — counts uses, nudges at threshold
 hooks/skill-forge-scan-nudge.sh    UserPromptSubmit — nudges a scan at your wrap-up command
 skill-forge/                       empty state scaffold (ledger.jsonl, usage.jsonl, counts/)
-settings.snippet.json              the three hook wirings to merge into ~/.claude/settings.json
+settings.snippet.json              the four hook wirings to merge into ~/.claude/settings.json
 INSTALL.md                         install + the wrap-up wiring note
 ```
 

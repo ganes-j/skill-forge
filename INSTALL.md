@@ -27,7 +27,7 @@ hook is dormant on an empty ledger, so nothing fires until there's something to 
 
 ## 3. Merge the hook wiring into `~/.claude/settings.json`
 
-`settings.snippet.json` is a **fragment**, not a drop-in file. Merge its three entries into the
+`settings.snippet.json` is a **fragment**, not a drop-in file. Merge its four entries into the
 matching arrays of your existing `~/.claude/settings.json`:
 
 - `SessionStart` → `skill-forge-status.sh` (surfaces your active forged skills each session)
@@ -72,4 +72,4 @@ the file to re-enable.
 rm -rf ~/.claude/skills/skill-forge ~/.claude/hooks/skill-forge-*.sh ~/.claude/skill-forge
 ```
 
-Then remove the three hook entries from `~/.claude/settings.json`.
+Then remove the four hook entries from `~/.claude/settings.json`.

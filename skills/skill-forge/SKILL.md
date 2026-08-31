@@ -55,9 +55,15 @@ Output: for each candidate — **gap** (one line), **what the skill/tool would d
 
 Triggered when a forged skill's counter reaches its `refine_threshold` (the usage hook nudges), or on request.
 
-1. Read `~/.claude/skill-forge/usage.jsonl` filtered to that skill, plus the skill's own file, to see how it's actually been invoked and where it was awkward or missed.
+1. Read `~/.claude/skill-forge/usage.jsonl` filtered to that skill, plus the skill's own file, to see how it's actually been invoked and where it was awkward or missed. The log carries bare events with no mode and no outcome, so it gives you *frequency and recency*, not awkwardness. When it is thin, drive the refine from the skill's **most recent real use** — where it misfired or you fought it — not from detail the log does not carry. A clean, working skill legitimately needs no edit; do not manufacture one to satisfy the nudge.
+
+   **The counter counts shell runs too, and the log distinguishes them.** A `Skill`-tool call logs `"event":"invoked"`; a skill whose payload is a script, driven straight from the shell, logs `"event":"ran"`. Two consequences when reading it. A skill whose payload is a script needs a threshold scaled to that unit, not the default of a few. And a shell command that merely *reads* a skill's directory counts as a use — deliberate, because using a skill without the `Skill` tool looks exactly like that from outside. The count can run slightly high, where counting tool calls alone ran catastrophically low.
+
+   **What no counter sees is the gap that matters most.** The real signal is often not how often a skill ran, but the one-off scripts hand-rolled *around* it — each one a capability it lacked. Nothing counts those. When a skill is in heavy use, read what got written alongside it.
 2. Improve the weakest thing: sharpen the `description` if it wasn't auto-invoking; fix steps that misfired; add a real rationalization/mistake seen in use; cut dead weight. Small, evidence-driven edits — not a rewrite.
 3. Reset the counter and stamp the refine: `printf 0 > ~/.claude/skill-forge/counts/<name>` and update that ledger line's `last_refined` to `date +%F`. Append a `{"event":"refined"}` line to `usage.jsonl`.
+
+   **Reviewed and found clean closes the same way**, with `"event":"reviewed-no-change"` — `last_refined` means "last refine pass", not "last edit". Skip it and the nudge re-fires on a skill you already cleared, which teaches the reader to ignore the nudge.
 4. If a skill is used near-zero over a long window, or a scan found it obsolete, propose **retire** (set `status:"retired"`, note why) — surface for sign-off, don't retire silently.
 
 ### status — list the forge
