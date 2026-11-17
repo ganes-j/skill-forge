@@ -55,13 +55,14 @@ actually earns its place — and refines it from real usage instead of guessing.
 - **scan** — at wrap-up, look for a genuine recurring capability gap. Filter hard; report clean if none.
 - **build** — forge the accepted candidate (using the `writing-skills` discipline), register a ledger line, smoke-test it.
 - **track** — a PostToolUse hook counts every invocation of a forged skill and nudges when it's due for refinement.
-- **refine** — read the real usage log, make small evidence-driven edits (sharper trigger description, fix a misfiring step), reset the counter.
+- **refine** — read the real usage log, make small evidence-driven edits (sharper trigger description, fix a misfiring step), then close the pass with `close-refine`, which resets the counter, stamps the ledger, and logs the event in one step.
 - **retire** — a skill used near-zero over a long window gets proposed for retirement. Surfaced for sign-off, never silent.
 
 ## What's in the box
 
 ```
 skills/skill-forge/SKILL.md        the skill itself (scan / build / refine / status modes)
+skills/skill-forge/close-refine    closes a refine pass: counter reset + ledger stamp + usage event
 hooks/skill-forge-status.sh        SessionStart — surfaces active forged skills; silent when empty
 hooks/skill-forge-usage.sh         PostToolUse(Skill) — counts uses, nudges at threshold
 hooks/skill-forge-scan-nudge.sh    UserPromptSubmit — nudges a scan at your wrap-up command
@@ -70,8 +71,8 @@ settings.snippet.json              the four hook wirings to merge into ~/.claude
 INSTALL.md                         install + the wrap-up wiring note
 ```
 
-It's stdlib bash + `jq`. No language runtime, no network, no dependencies beyond `jq` and a
-Claude Code install.
+The hooks are stdlib bash + `jq`. The closer is one stdlib-only Python 3 script. No network, no
+packages to install.
 
 ## Install
 
@@ -109,6 +110,16 @@ hook change:
 
 ```bash
 bash tests/smoke-hooks.sh
+```
+
+The same mismatch came back from the other side. Closing a refine pass is three writes (reset the
+counter, stamp `last_refined`, append the event), and done by hand they drifted: the usage log ended
+up in three incompatible shapes, one keyed on fields no reader filters on, and one spaced line that a
+compact-format match could not see. `close-refine` now owns all three writes and the exact event
+shape. `tests/smoke-close-refine.sh` pins it against a scratch state dir:
+
+```bash
+bash tests/smoke-close-refine.sh
 ```
 
 Or verify a single hook by hand — pipe a payload through it and confirm it logs and counts:

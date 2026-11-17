@@ -1,7 +1,7 @@
 # Installing skill-forge
 
-Requirements: [Claude Code](https://claude.com/claude-code), `jq`, and a POSIX shell. No language
-runtime or network access.
+Requirements: [Claude Code](https://claude.com/claude-code), `jq`, a POSIX shell, and Python 3 at
+`/usr/bin/python3` for the `close-refine` script (stdlib only). No network access.
 
 ## 1. Copy the skill and hooks into `~/.claude/`
 
@@ -10,8 +10,11 @@ From a clone of this repo:
 ```bash
 cp -R skills/skill-forge   ~/.claude/skills/
 cp    hooks/skill-forge-*.sh ~/.claude/hooks/
-chmod +x ~/.claude/hooks/skill-forge-*.sh
+chmod +x ~/.claude/hooks/skill-forge-*.sh ~/.claude/skills/skill-forge/close-refine
 ```
+
+`close-refine` names `/usr/bin/python3` in its shebang on purpose, so an activated project
+virtualenv cannot shadow it. If your Python 3 lives elsewhere, edit that one line.
 
 ## 2. Create the empty state dir
 
@@ -58,6 +61,7 @@ Start a fresh Claude Code session. With an empty ledger, skill-forge is silent �
 
 - **Status hook is silent on empty state:** `bash ~/.claude/hooks/skill-forge-status.sh </dev/null; echo "exit=$?"` → no output, `exit=0`.
 - **Usage hook increments a count:** invoke a skill named in your ledger through the `Skill` tool and check `cat ~/.claude/skill-forge/counts/<name>`.
+- **Closer previews its three writes:** `~/.claude/skills/skill-forge/close-refine <name> --dry-run` → prints the counter reset, the ledger stamp, and the usage line, and writes nothing.
 
 Then run your wrap-up command and confirm the scan nudge appears.
 

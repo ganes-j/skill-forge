@@ -1,0 +1,173 @@
+#!/usr/bin/python3
+"""Close a skill-forge refine pass: reset the counter, stamp the ledger, log the event.
+
+The three parts have to happen together or the ledger lies, and stating them in prose
+was not enough. The log previously drifted into three incompatible shapes, one keyed on
+`skill`/`date` and therefore invisible to every reader that filters on `.name`. A closer
+written by hand five times in one session also produced a `json.dumps`-spaced event line
+that a `"name":"x"` grep could not match.
+
+Shebang is /usr/bin/python3 by explicit path, not `env python3`: an activated project
+virtualenv shadows `python3` on PATH and this must keep working from any directory.
+
+Usage:
+  close-refine <name>                 # a pass that changed something
+  close-refine <name> --no-change     # reviewed and found clean; closes the same way
+  close-refine <name> --dry-run       # print the three writes, perform none
+
+Options:
+      --no-change   log "reviewed-no-change" instead of "refined"
+      --force       close again on a day this skill was already closed
+      --dry-run     print what would happen, write nothing
+      --root PATH   state directory; default ~/.claude/skill-forge
+"""
+import json
+import os
+import subprocess
+import sys
+
+CLOSE_EVENTS = ('refined', 'reviewed-no-change')
+
+
+def today():
+    """Shell out for the date. Never author it, and never trust a harness clock."""
+    out = subprocess.run(['date', '+%F'], capture_output=True, text=True)
+    stamp = out.stdout.strip()
+    if out.returncode != 0 or len(stamp) != 10:
+        sys.exit('could not read the date from `date +%%F`: %r' % stamp)
+    return stamp
+
+
+def parse_args(argv):
+    flags = {'--no-change', '--force', '--dry-run'}
+    opts = {f: False for f in flags}
+    root = os.path.expanduser('~/.claude/skill-forge')
+    names = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == '--root':
+            if i + 1 >= len(argv):
+                sys.exit('--root needs a path')
+            root, i = argv[i + 1], i + 1
+        elif a in flags:
+            opts[a] = True
+        elif a in ('-h', '--help'):
+            sys.stdout.write(__doc__)
+            sys.exit(0)
+        elif a.startswith('-'):
+            sys.exit('unknown option: %s' % a)
+        else:
+            names.append(a)
+        i += 1
+    if len(names) != 1:
+        sys.exit('name exactly one skill (got %d). See --help.' % len(names))
+    return names[0], root, opts
+
+
+def main():
+    name, root, opts = parse_args(sys.argv[1:])
+    ledger_path = os.path.join(root, 'ledger.jsonl')
+    usage_path = os.path.join(root, 'usage.jsonl')
+    count_path = os.path.join(root, 'counts', name)
+
+    if not os.path.exists(ledger_path):
+        sys.exit('no ledger at %s' % ledger_path)
+
+    # Keep every untouched line byte-identical: parse only to find the match, and
+    # re-serialize that one line. A whole-file rewrite would silently restyle the file.
+    raw_lines = open(ledger_path, encoding='utf-8').read().splitlines()
+    hits = []
+    for i, line in enumerate(raw_lines):
+        if not line.strip():
+            continue
+        try:
+            obj = json.loads(line)
+        except ValueError:
+            continue
+        if obj.get('name') == name:
+            hits.append((i, obj))
+
+    if not hits:
+        sys.exit('%r is not in %s.\n'
+                 'Run with the ledger name exactly as registered, or register it first '
+                 '(skill-forge build mode, step 2).' % (name, ledger_path))
+    if len(hits) > 1:
+        sys.exit('%r appears on %d ledger lines (%s). Ambiguous: fix the duplicate '
+                 'before closing.' % (name, len(hits),
+                                      ', '.join(str(i + 1) for i, _ in hits)))
+
+    idx, row = hits[0]
+    status = row.get('status', 'active')
+    if status != 'active' and not opts['--force']:
+        sys.exit('%r is status %r, not active. Closing a refine on it would record work '
+                 'on a skill that is out of service. Re-activate it first, or pass '
+                 '--force.' % (name, status))
+
+    stamp = today()
+    event = 'reviewed-no-change' if opts['--no-change'] else 'refined'
+
+    # A double close is a mistake, not a no-op: it double-counts in the only log the
+    # flywheel reads. Refuse rather than append a second identical event.
+    already = []
+    if os.path.exists(usage_path):
+        for line in open(usage_path, encoding='utf-8'):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                o = json.loads(line)
+            except ValueError:
+                continue
+            if (o.get('name') == name and o.get('ts') == stamp
+                    and o.get('event') in CLOSE_EVENTS):
+                already.append(o.get('event'))
+    if already and not opts['--force']:
+        sys.exit('%r was already closed today as %r. A second close double-counts in '
+                 'the flywheel log. Pass --force if the second pass is genuinely a '
+                 'separate one.' % (name, already[-1]))
+
+    old_refined = row.get('last_refined', '(unset)')
+    try:
+        count_now = open(count_path, encoding='utf-8').read().strip() or '0'
+    except OSError:
+        count_now = '(no counts file)'
+
+    # The two files use different JSON styles on purpose. ledger.jsonl is written with
+    # default separators, usage.jsonl compact, because readers grep it for `"name":"x"`
+    # and a spaced line silently fails that match.
+    row['last_refined'] = stamp
+    new_ledger_line = json.dumps(row)
+    event_line = json.dumps({'name': name, 'ts': stamp, 'event': event},
+                            separators=(',', ':'))
+
+    if opts['--dry-run']:
+        print('DRY RUN, nothing written')
+        print('  counter: %s  (%s -> 0)' % (count_path, count_now))
+        print('  ledger : line %d  last_refined %s -> %s' % (idx + 1, old_refined, stamp))
+        print('  usage  : %s' % event_line)
+        return 0
+
+    os.makedirs(os.path.dirname(count_path), exist_ok=True)
+    with open(count_path, 'w', encoding='utf-8') as fh:
+        fh.write('0')
+
+    raw_lines[idx] = new_ledger_line
+    tmp = ledger_path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as fh:
+        fh.write('\n'.join(raw_lines) + '\n')
+    os.replace(tmp, ledger_path)          # atomic; a crash cannot leave a half ledger
+
+    with open(usage_path, 'a', encoding='utf-8') as fh:
+        fh.write(event_line + '\n')
+
+    print('closed %s as %s' % (name, event))
+    print('  counter reset (was %s, threshold %s)'
+          % (count_now, row.get('refine_threshold', '?')))
+    print('  last_refined %s -> %s' % (old_refined, stamp))
+    print('  logged %s' % event_line)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

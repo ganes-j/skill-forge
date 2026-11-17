@@ -16,8 +16,8 @@ outcome log: no entry, no learning.
   - `last_refined` — YYYY-MM-DD of the last refine pass
   - `refine_threshold` — uses-since-refine that trigger a refine nudge (default 3 — "a few times")
   - `status` — `active` | `retired`
-- **`usage.jsonl`** — append-only audit, one line per invocation: `{"name","ts","session","event"}`. The refine pass reads this to see *how* a skill has actually been used.
-- **`counts/<name>`** — plain integer, uses since last refine. The usage hook increments it; a refine pass resets it to `0`.
+- **`usage.jsonl`** — append-only audit, one compact line per event. The usage hook writes `{"name","ts","session","event"}` with event `invoked` (a `Skill`-tool call), `ran` (a shell run of the skill's script), or `scan` (skill-forge's own scan mode, logged but not counted). `close-refine` writes `{"name","ts","event"}` with event `refined` or `reviewed-no-change`. The refine pass reads this to see *how* a skill has actually been used.
+- **`counts/<name>`** — plain integer, uses since last refine. The usage hook increments it; `close-refine` resets it to `0`.
 
 Ships empty. These files fill in as you forge and use skills — keep them **out of any public
 mirror of your setup** (they name your private skills). See the repo `.gitignore`.
@@ -26,7 +26,7 @@ mirror of your setup** (they name your private skills). See the repo `.gitignore
 
 1. **scan** (wrap-up) → propose capability gaps → the maintainer accepts one → **build** → new `ledger.jsonl` line.
 2. Every `Skill` invocation of a forged name → `skill-forge-usage.sh` appends to `usage.jsonl`, bumps `counts/<name>`.
-3. `counts/<name>` reaches `refine_threshold` → hook nudges "due for refinement" → **refine** reads `usage.jsonl`, improves the skill, resets the counter, bumps `last_refined`.
+3. `counts/<name>` reaches `refine_threshold` → hook nudges "due for refinement" → **refine** reads `usage.jsonl`, improves the skill, then `close-refine <name>` resets the counter, bumps `last_refined`, and logs the event.
 
 ## Kill switch
 
