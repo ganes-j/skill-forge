@@ -61,6 +61,10 @@ if echo "$nudge" | grep -q 'threshold 3'; then pass "nudge fired at threshold"; 
 # The refine DATE is the counter-evidence that stops a bare count being read as a verdict.
 # Without it the nudge is just a number and gets relayed as a finding; pin it.
 if echo "$nudge" | grep -q '2026-01-01'; then pass "nudge carries last_refined date"; else bad "nudge omitted last_refined date"; fi
+# The nudge must send the reader to the closer. Describing the three hand writes here is how the
+# usage log drifted into shapes its own readers could not match.
+if echo "$nudge" | grep -q 'close-refine demo-skill --no-change'; then pass "nudge names the closer"; else bad "nudge does not name close-refine"; fi
+if echo "$nudge" | grep -q 'by appending'; then bad "nudge still describes a hand-close"; else pass "nudge no longer describes a hand-close"; fi
 
 echo "TEST 5: --detect-bash counts a skill driven straight from the shell"
 BASHPAYLOAD='{"tool_input":{"command":"~/.claude/skills/demo-skill/run.sh --flag"},"session_id":"shell"}'

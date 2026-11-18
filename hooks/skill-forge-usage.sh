@@ -54,7 +54,7 @@ bump_and_nudge() {
       [ "$days" -ge 0 ] && since="$since ($days days ago)"
     fi
   fi
-  msg="Forged skill '$skill': counter at $count, threshold $threshold, $since. Before you act on this: the count includes shell commands that merely READ the skill's directory, and a burst of runs in one session inflates it fast — so it is a prompt to look, not a finding. Check the refine date above and how the skill actually behaved in recent real use. Do NOT relay this nudge to the maintainer as a verdict without that check. If it needs work, run the skill-forge skill in refine mode. If it is fine as-is, that is a valid and common outcome — close it by appending {\"name\":\"$skill\",\"ts\":\"<date +%F>\",\"event\":\"reviewed-no-change\"} to ~/.claude/skill-forge/usage.jsonl, resetting the counter, and stamping last_refined. Advisory, not a gate."
+  msg="Forged skill '$skill': counter at $count, threshold $threshold, $since. Before you act on this: the count includes shell commands that merely READ the skill's directory, and a burst of runs in one session inflates it fast — so it is a prompt to look, not a finding. Check the refine date above and how the skill actually behaved in recent real use. Do NOT relay this nudge to the maintainer as a verdict without that check. If it needs work, run the skill-forge skill in refine mode. If it is fine as-is, that is a valid and common outcome — close it with ~/.claude/skills/skill-forge/close-refine $skill --no-change, which resets the counter, stamps last_refined, and logs the event. Do not hand-write those three writes. Advisory, not a gate."
   jq -cn --arg m "$msg" --arg e "$event" '{hookSpecificOutput:{hookEventName:$e,additionalContext:$m}}'
 }
 
